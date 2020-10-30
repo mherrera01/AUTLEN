@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include "afnd.h"
 
+AFND * quitarLambda(AFND * afndl);
 AFND * AFNDTransforma(AFND * afnd);
 
 #endif

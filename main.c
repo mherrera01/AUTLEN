@@ -12,7 +12,7 @@ int main(int argc, char ** argv)
     AFNDInsertaSimbolo(p_afnd, "0");
     AFNDInsertaSimbolo(p_afnd,".");
 
-    AFNDInsertaEstado(p_afnd, "q0",INICIAL);
+    AFNDInsertaEstado(p_afnd, "q0", INICIAL);
     AFNDInsertaEstado(p_afnd, "q1", NORMAL);
     AFNDInsertaEstado(p_afnd, "q2", NORMAL);
     AFNDInsertaEstado(p_afnd, "q3", NORMAL);
@@ -34,11 +34,13 @@ int main(int argc, char ** argv)
     /* Función implementada en transforma.c */
     afd = AFNDTransforma(p_afnd);
 
-    AFNDImprime(stdout,afd);
+    /*
+    AFNDImprime(stdout, afd);
     AFNDADot(afd);
 
     AFNDElimina(afd);
     AFNDElimina(p_afnd);
+    */
 
     return 0;
 }
