@@ -53,9 +53,10 @@ AFND * quitarLambda(AFND* afndl){
     Transicion tran;
     int num_estados, num_simbolos;
     int estado_inicial;
+    int max;
 
     /* Contadores de loops */
-    int i, j, x, z, k, h;
+    int i, j, x, z, k, h, a;
 
     /* Control de errores */
     if(afndl == NULL){
@@ -86,55 +87,99 @@ AFND * quitarLambda(AFND* afndl){
     /* Hemos insertado el cierre del estado inicial (nuevo estado) */
     afd.num_estados++;
 
-    afd.compone_transicion[0] = 0;
-    for (x=0; x < num_simbolos; x++){
-        for(i=0; i < afd.compone_estado[0]; i++){
-            for (z=0; z < num_estados; z++){
-                if (AFNDTransicionIndicesEstadoiSimboloEstadof(afndl, afd.estados[0][i], x, z)){
-                    tran.simbolo = x;
-                    tran.transita_estado = z;
+    for (j=0; j < afd.num_estados; j++){
+        print_AFD(afndl, afd);
+        printf("\nNúmero de estados nuevos: %d | J:%d\n\n", afd.num_estados, j);
+        printf("Compone estado: %d\n", afd.compone_estado[j]);
 
-                    afd.transiciones[0][afd.compone_transicion[0]] = tran;
-                    afd.compone_transicion[0]++;
+        /* Añadir las transiciones a los estados nuevos con cada símbolo */
+        for (x=0; x < num_simbolos; x++){
+            for(i=0; i < afd.compone_estado[j]; i++){
+                for (z=0; z < num_estados; z++){
+                    if (AFNDTransicionIndicesEstadoiSimboloEstadof(afndl, afd.estados[j][i], x, z)){
+                        tran.simbolo = x;
+                        tran.transita_estado = z;
+
+                        afd.transiciones[j][afd.compone_transicion[j]] = tran;
+                        afd.compone_transicion[j]++;
+                    }
                 }
             }
-        }
 
-        /* Comprobar si ya existe el nuevo estado */
-        int contador = 0;
+            /* Comprobar si ya existe el nuevo estado */
+            int contador = 0;
+            int num_tran_con_x = 0;
 
-        for (k=0; k < afd.compone_estado[0]; k++){
-            for (h=0; h < afd.compone_transicion[0]; h++){
-                printf("K:%d H:%d ", k, h);
-                if (afd.transiciones[0][h].simbolo == x){
-                    printf ("Estado: %d, Transición: %d\n", afd.estados[0][k], afd.transiciones[0][h].transita_estado);
-                    if (afd.estados[0][k] == afd.transiciones[0][h].transita_estado){
-                        printf("Estado y transición iguales con Símbolo: %d\n", afd.transiciones[0][h].simbolo);
-                        contador++;
+            for (a=0; a < afd.num_estados; a++) {
+                for (k=0; k < afd.compone_estado[a]; k++){
+                    for (h=0; h < afd.compone_transicion[j]; h++){
+                        printf("A:%d K:%d H:%d ", a, k, h);
+                        if (afd.transiciones[j][h].simbolo == x){
+                            printf ("Estado: %d, Transición: %d\n", afd.estados[a][k], afd.transiciones[j][h].transita_estado);
+                            if (afd.estados[a][k] == afd.transiciones[j][h].transita_estado){
+                                printf("Estado y transición iguales con Símbolo: %d\n", afd.transiciones[j][h].simbolo);
+                                contador++;
+                            }
+                        }
                     }
                 }
 
+                /* Vemos cuántas transiciones con símbolo x hay */
+                for (h=0; h < afd.compone_transicion[j]; h++){
+                    if (afd.transiciones[j][h].simbolo == x){
+                        num_tran_con_x++;
+                    }
+                }
+
+                /* El estado ya existe */
+                if (afd.compone_estado[a] >= num_tran_con_x){
+                    max = afd.compone_estado[a];
+                } else {
+                    max = num_tran_con_x;
+                }
+
+                if (contador == max){
+                    contador = -1;
+                    break;
+                }
+
+                contador = 0;
+                num_tran_con_x = 0;
             }
-        }
-        printf("FIN DEL BUCLE.\n");
+            printf("FIN DEL BUCLE.\n");
 
-        /* El estado ya existe */
-        if (contador == afd.compone_estado[0]){
-            break;
-        } else {
-            /* No existe, incluir estado nuevo */
-            printf("No existe el estado. Lo creamos\n");
-            afd.compone_estado[afd.num_estados] = 0;
-
-            for (k=0; k < afd.compone_transicion[0]; k++) {
-                if (afd.transiciones[0][k].simbolo == x){
-                    afd.estados[afd.num_estados][afd.compone_estado[afd.num_estados]] = afd.transiciones[0][k].transita_estado;
-                    afd.compone_transicion[afd.num_estados] = 0;
-                    afd.compone_estado[afd.num_estados]++;
+            /* Vemos si hay alguna transición con ese símbolo */
+            for (h=0; h < afd.compone_transicion[j]; h++){
+                if (afd.transiciones[j][h].simbolo == x){
+                    num_tran_con_x++;
                 }
             }
 
-            afd.num_estados++;
+            /* El estado ya existe */
+            if (contador == -1 || num_tran_con_x == 0){
+                continue;
+            } else {
+                /* No existe, incluir estado nuevo */
+                printf("No existe el estado. Lo creamos\n");
+                afd.compone_estado[afd.num_estados] = 0;
+
+                for (k=0; k < afd.compone_transicion[j]; k++) {
+                    if (afd.transiciones[j][k].simbolo == x){
+
+                        for (h=0; h < num_estados; h++){
+                            if(AFNDCierreLTransicionIJ(afndl, afd.transiciones[j][k].transita_estado, h)){
+                                /* Insertamos los estados del cierre lambda al nuevo estado */
+                                afd.estados[afd.num_estados][afd.compone_estado[afd.num_estados]] = h;
+                                afd.compone_estado[afd.num_estados]++;
+                            }
+                        }
+
+                        afd.compone_transicion[afd.num_estados] = 0;
+                    }
+                }
+
+                afd.num_estados++;
+            }
         }
     }
 
