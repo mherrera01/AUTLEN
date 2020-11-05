@@ -4,7 +4,7 @@ CFLAGS = -g -Wall
 OBJECTS = main.o transforma.o
 
 #We specify that the files are not related with the rules, so that the makefile will not search for a file called as a rule
-.PHONY: all clean
+.PHONY: all clean runv
 
 #Rules declaration
 all: clean practica-1
@@ -22,3 +22,6 @@ transforma.o: transforma.c transforma.h
 #Clean all the generated files
 clean:
 	rm -rf *.o practica-1
+
+runv:
+	valgrind --leak-check=full ./practica-1

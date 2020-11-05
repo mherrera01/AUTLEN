@@ -38,9 +38,8 @@ int main(int argc, char ** argv)
     AFNDImprime(stdout, afd);
     AFNDADot(afd);
 
-    AFNDElimina(afd);
+    AFNDElimina(afd); */
     AFNDElimina(p_afnd);
-    */
 
     return 0;
 }
