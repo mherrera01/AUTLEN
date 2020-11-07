@@ -15,7 +15,7 @@ int main(int argc, char *argv[]){
     
     l1 = list_ini(int_destroy, int_copy, int_print, int_compare);
     l2 = list_ini(int_destroy, int_copy, int_print, int_compare);
-    l3 = list_ini(estado_destroy, estado_copy, estado_print, estado_compare);
+    l3 = list_ini(estado_destroy, estado_clone, estado_print, estado_compare);
 
     /* x = your input number */
     x = atoi(argv[1]);

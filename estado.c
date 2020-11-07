@@ -1,9 +1,6 @@
-
 #include "estado.h"
 #include "int.h"
 #include "list.h"
-#include <stdlib.h>
-#include <stdio.h>
 
 typedef void (*destroy_element_function_type)(void*);
 typedef void* (*copy_element_function_type)(const void*);
@@ -14,7 +11,7 @@ void estado_destroy(void* v){
     if(v) list_destroy(v);
 }
 
-void* estado_copy(const void* element){
+void* estado_clone(const void* element){
     int i;
     List* l;
 

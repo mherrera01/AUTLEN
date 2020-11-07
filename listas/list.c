@@ -207,7 +207,7 @@ int list_isEmpty (const List* list){
 }
 
 /* Returns the information stored in the i-th node of the list. In case of 1, returns NULL. */
-const void* list_get (const List* list, int index){
+void* list_get (const List* list, int index){
     NodeList *aux;
     int i=-1;
     if (!list) return NULL;

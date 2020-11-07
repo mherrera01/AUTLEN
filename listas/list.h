@@ -38,7 +38,7 @@ void * list_extractLast (List* list);
 /* Checks if a list is empty or not. */
 int list_isEmpty (const List* list);
 /* Returns the information stored in the i-th node of the list. In case of error, returns NULL. */
-const void* list_get (const List* list, int index);
+void* list_get (const List* list, int index);
 /* Returns the number of elements in a list. */
 int list_size (const List* list);
 /* Prints a list returning the number of written characters. */

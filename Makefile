@@ -1,7 +1,7 @@
 #Macros definition
 CC = gcc
 CFLAGS = -g -Wall
-OBJECTS = main.o transforma.o state_list.o int_list.o debugger.o list.o int.o estado.o
+OBJECTS = main.o transforma.o debugger.o list.o int.o estado.o
 
 #We specify that the files are not related with the rules, so that the makefile will not search for a file called as a rule
 .PHONY: all clean runv
@@ -17,12 +17,6 @@ main.o: main.c
 	$(CC) $(CFLAGS) -c $<
 
 transforma.o: transforma.c transforma.h 
-	$(CC) $(CFLAGS) -c $<
-
-int_list.o: int_list.c int_list.h
-	$(CC) $(CFLAGS) -c $<
-
-state_list.o: state_list.c state_list.h
 	$(CC) $(CFLAGS) -c $<
 
 debugger.o: debugger.c debugger.h

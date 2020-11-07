@@ -15,7 +15,7 @@ void dlog(char* message){
 
     /* Abrimos para escribir el mensaje en el archivo txt */
     log = fopen("DEBUG.txt", "a");
-    fprintf(log, message);
+    fprintf(log, "%s", message);
     fprintf(log, "\n");
 
     /* Cerramos el archivo txt */
