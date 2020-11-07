@@ -5,15 +5,19 @@ int addCierreLambda(AFND* afnd, int estado, List* cierre);
 AFND* AFNDTransforma(AFND* afnd){
     /* Lista de estados */
     List* estados = NULL;
-    List* transiciones = NULL;
 
     /* Lista de enteros */
     List* cierre_inicial = NULL;
     List* compone_estado = NULL;
     List* compone_transicion = NULL;
 
+    /* Lista de enteros correspondiente al manejo de las transiciones */
+    List* transiciones_origen = NULL;
+    List* transiciones_destino = NULL;
+    List* transiciones_simbolo = NULL;
+
     int num_estados, num_simbolos;
-    int estado_inicial;
+    int estado_inicial, origen_pos, destino_pos;
     int *transita_estado = NULL;
 
     /* Contadores de loop */
@@ -65,8 +69,6 @@ AFND* AFNDTransforma(AFND* afnd){
         return NULL;
     }
 
-    list_print(stdout, cierre_inicial);
-
     /* Lo añadimos a la lista de estados nuevos */
     if (list_insertLast(estados, cierre_inicial)){
         dlog("ERROR: No se añadió el cierre de un estado a la lista correctamente");
@@ -76,7 +78,32 @@ AFND* AFNDTransforma(AFND* afnd){
     }
     list_destroy(cierre_inicial);
 
-    list_print(stdout, estados);
+    /* Creamos una lista de enteros para las transiciones origen */
+    transiciones_origen = list_ini(int_destroy, int_copy, int_print, int_compare);
+    if (transiciones_origen == NULL){
+        dlog("ERROR: La lista de las transiciones origen no se creó correctamente");
+        list_destroy(estados);
+        return NULL;
+    }
+
+    /* Creamos una lista de enteros para las transiciones destino */
+    transiciones_destino = list_ini(int_destroy, int_copy, int_print, int_compare);
+    if (transiciones_destino == NULL){
+        dlog("ERROR: La lista de las transiciones destino no se creó correctamente");
+        list_destroy(transiciones_origen);
+        list_destroy(estados);
+        return NULL;
+    }
+
+    /* Creamos una lista de enteros para los símbolos de las transiciones */
+    transiciones_simbolo = list_ini(int_destroy, int_copy, int_print, int_compare);
+    if (transiciones_simbolo == NULL){
+        dlog("ERROR: La lista de los símbolos de las transiciones no se creó correctamente");
+        list_destroy(transiciones_origen);
+        list_destroy(transiciones_destino);
+        list_destroy(estados);
+        return NULL;
+    }
 
     /* Recorremos la lista de estados para procesar sus transiciones y crear nuevos
     estados en caso de que no existan ya */
@@ -84,14 +111,9 @@ AFND* AFNDTransforma(AFND* afnd){
         compone_estado = list_get(estados, i);
         if (compone_estado == NULL){
             dlog("ERROR: La lista del cierre incial no se creó correctamente");
-            list_destroy(estados);
-            return NULL;
-        }
-
-        /* Creamos una lista de estados para las transiciones de compone_estado con todos los símbolos */
-        transiciones = list_ini(estado_destroy, estado_clone, estado_print, estado_compare);
-        if (transiciones == NULL){
-            dlog("ERROR: La lista de transiciones no se creó correctamente");
+            list_destroy(transiciones_origen);
+            list_destroy(transiciones_destino);
+            list_destroy(transiciones_simbolo);
             list_destroy(estados);
             return NULL;
         }
@@ -104,7 +126,9 @@ AFND* AFNDTransforma(AFND* afnd){
             if (compone_transicion == NULL){
                 sprintf(Message, "ERROR: La lista de transiciones con el símbolo %s no se creó correctamente", AFNDSimboloEn(afnd, j));
                 dlog(Message);
-                list_destroy(transiciones);
+                list_destroy(transiciones_origen);
+                list_destroy(transiciones_destino);
+                list_destroy(transiciones_simbolo);
                 list_destroy(estados);
                 return NULL;
             }
@@ -115,18 +139,19 @@ AFND* AFNDTransforma(AFND* afnd){
                     /* Vemos si se puede transitar del estado k a l con el símbolo j */
                     transita_estado = list_get(compone_estado, l);
 
-                    if (AFNDTransicionIndicesEstadoiSimboloEstadof(afnd, k, j, *transita_estado)){
+                    if (AFNDTransicionIndicesEstadoiSimboloEstadof(afnd, *transita_estado, j, k)){
                         /* Añadimos a la lista de enteros el nuevo estado al que hemos transitado (incluyendo lambda) */
-                        if (addCierreLambda(afnd, l, compone_transicion)){
-                            sprintf(Message, "ERROR: Al crear el cierre lambda de q%d", l);
+                        if (addCierreLambda(afnd, k, compone_transicion)){
+                            sprintf(Message, "ERROR: Al crear el cierre lambda de q%d", k);
                             dlog(Message);
                             list_destroy(compone_transicion);
-                            list_destroy(transiciones);
+                            list_destroy(transiciones_origen);
+                            list_destroy(transiciones_destino);
+                            list_destroy(transiciones_simbolo);
                             list_destroy(estados);
                             return NULL;
                         }
                     }
-
                 }
             }
 
@@ -142,17 +167,50 @@ AFND* AFNDTransforma(AFND* afnd){
                 if (list_insertLast(estados, compone_transicion)){
                     dlog("ERROR: No se añadió el cierre de un estado a la lista correctamente");
                     list_destroy(compone_transicion);
-                    list_destroy(transiciones);
+                    list_destroy(transiciones_origen);
+                    list_destroy(transiciones_destino);
+                    list_destroy(transiciones_simbolo);
                     list_destroy(estados);
                     return NULL;
                 }
             }
 
             /* Añadimos la transición al estado que estamos procesando */
-            if (list_insertLast(transiciones, compone_transicion)){
-                dlog("ERROR: No se añadió la transición a la lista correctamente");
+
+            /* Añadimos la transición origen que corresponde al estado en el que estamos ahora */
+            origen_pos = list_getIndex(estados, compone_estado);
+            if (list_insertLast(transiciones_origen, &origen_pos)){
+                sprintf(Message, "ERROR: No se añadió la transición origen en el índice %d a la lista correctamente", origen_pos);
+                dlog(Message);
                 list_destroy(compone_transicion);
-                list_destroy(transiciones);
+                list_destroy(transiciones_origen);
+                list_destroy(transiciones_destino);
+                list_destroy(transiciones_simbolo);
+                list_destroy(estados);
+                return NULL;
+            }
+
+            /* Añadimos la transición destino que corresponde al estado al que llegamos con el símbolo j */
+            destino_pos = list_getIndex(estados, compone_transicion);
+            if (list_insertLast(transiciones_destino, &destino_pos)){
+                sprintf(Message, "ERROR: No se añadió la transición destino en el índice %d a la lista correctamente", destino_pos);
+                dlog(Message);
+                list_destroy(compone_transicion);
+                list_destroy(transiciones_origen);
+                list_destroy(transiciones_destino);
+                list_destroy(transiciones_simbolo);
+                list_destroy(estados);
+                return NULL;
+            }
+
+            /* Añadimos el símbolo de la transición que corresponde al símbolo j */
+            if (list_insertLast(transiciones_simbolo, &j)){
+                sprintf(Message, "ERROR: No se añadió el símbolo %s de la transición a la lista correctamente", AFNDSimboloEn(afnd, j));
+                dlog(Message);
+                list_destroy(compone_transicion);
+                list_destroy(transiciones_origen);
+                list_destroy(transiciones_destino);
+                list_destroy(transiciones_simbolo);
                 list_destroy(estados);
                 return NULL;
             }
@@ -160,13 +218,12 @@ AFND* AFNDTransforma(AFND* afnd){
         }
     }
 
-    list_print(stdout, estados);
-    list_print(stdout, transiciones);
-
-    /* Convertimos el afd transformado de una estructura a la de la librería */
+    /* Convertimos el afd transformado de nuestra estructura a la de la librería */
 
     /* Liberamos memoria */
-    list_destroy(transiciones);
+    list_destroy(transiciones_origen);
+    list_destroy(transiciones_destino);
+    list_destroy(transiciones_simbolo);
     list_destroy(estados);
 
     return NULL;
@@ -187,7 +244,6 @@ int addCierreLambda(AFND* afnd, int estado, List* cierre){
         if (AFNDCierreLTransicionIJ(afnd, estado, i)) {
             /* Hay transición lambda. Añadimos a la lista del cierre en caso de que no esté ya */
             if (!list_contains(cierre, &i)){
-                printf("Transición a %d", i);
                 if (list_insertLast(cierre, &i)) {
                     dlog("ERROR: No se añadió un estado a la lista del cierre correctamente");
                     return 1;
