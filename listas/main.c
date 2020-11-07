@@ -8,6 +8,7 @@
 int main(int argc, char *argv[]){
     List *l1, *l2, *l3;
     int i, x;
+    int p2=2, p8=8, p50=50;
     if(argc < 2){
         printf("Usage: %s <number>\n", argv[0]);
         return 1;
@@ -29,12 +30,16 @@ int main(int argc, char *argv[]){
 
     list_insertLast(l3, l1);
     list_insertLast(l3, l2);
-    printf("Boolean: %d\n", list_contains(l3, l2));
+    printf("Boolean A (1): %d\n", list_contains(l1, &p2));
+    printf("Boolean B (0): %d\n", list_contains(l2, &p50));
+    printf("Boolean C (1): %d\n", list_contains(l1, &p8));
+    printf("Boolean D (1): %d\n", list_contains(l2, &p2));
+    printf("Boolean E (1): %d\n", list_contains(l3, l2));
 
     /* Printing the lists */
-    list_print(stdout, l1);
+    /*list_print(stdout, l1);
     list_print(stdout, l2);
-    list_print(stdout, l3);
+    list_print(stdout, l3);*/
 
     /* Destroying lists and files */
     list_destroy(l1);

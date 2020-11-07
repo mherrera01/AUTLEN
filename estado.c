@@ -7,6 +7,8 @@ typedef void* (*copy_element_function_type)(const void*);
 typedef int (*print_element_function_type)(FILE *, const void*);
 typedef int (*cmp_element_function_type)(const void*, const void*);
 
+#define debug 0
+
 void estado_destroy(void* v){
     if(v) list_destroy(v);
 }
@@ -43,18 +45,26 @@ int estado_compare(const void* i, const void* j){
     List* lj;
     int x;
 
-    if(i == NULL || j == NULL) return 0;
+    if(i == NULL || j == NULL){
+        return 0;
+        if(debug) printf("Una de las listas en es NULL\n");
+    }
 
     li = (List*)i;
     lj = (List*)j;
 
-    if(list_size(li) != list_size(lj)) return 2;
+    if(list_size(li) != list_size(lj)){
+        return 2;
+        if(debug) printf("Las listas tienen distinto tamaño %d vs %d\n", list_size(li), list_size(lj));
+    }
 
     for(x = 0; x < list_size(li); x++){
-        if(list_get(li, x) != list_get(lj, x)){
+        if(*(int*)list_get(li, x) != *(int*)list_get(lj, x)){
+            if(debug) printf("El elemento %d de las listas es distinto (%d vs %d)\n", x, *(int*)list_get(li, x), *(int*)list_get(lj, x));
             return 1;
         }
     }
 
+    if(debug) printf("Las listas son iguales :0\n");
     return 0;
 }

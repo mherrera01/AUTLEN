@@ -259,7 +259,7 @@ int list_contains (List* list, void* element){
     int i;
 
     for(i = 0; i < list_size(list); i++){
-        if(list->cmp_element_function(element, list_get(list, i))) return 1;
+        if((list->cmp_element_function(element, list_get(list, i))) == 0) return 1;
     }
 
     return 0;
