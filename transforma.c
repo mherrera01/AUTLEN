@@ -45,6 +45,9 @@ AFND* AFNDTransforma(AFND* afnd){
         return NULL;
     }
 
+    /* Realizmos el cierre transitivo de la relación de accesibilidad inducida por las transiciones lambda */
+    AFNDCierraLTransicion(afnd);
+
     /* Obtenemos el # de estados y símbolos del afnd a transformar */
     num_estados = AFNDNumEstados(afnd);
     sprintf(Message, "Número de Estados del afnd: %d", num_estados);
