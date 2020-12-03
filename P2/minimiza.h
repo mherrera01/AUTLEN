@@ -11,6 +11,6 @@
 #include "estado.h"
 
 /* Minimiza un autómata finito determinista */
-AFND *AFNDMinimiza(AFND *afnd);
+AFND *AFNDMinimiza(AFND *afd);
 
 #endif
