@@ -13,9 +13,13 @@ AFND* AFNDMinimiza(AFND* afd){
 
     /* Lista de enteros */
     List* estados_accesibles = NULL;
+    List* clase_finales = NULL;
+    List* clase_noFinales = NULL;
+    List* clase = NULL;
 
-    int num_estados, num_simbolos;
-    int *estado = NULL;
+    int num_estados, num_simbolos, num_estados_accesibles;
+    int tipoEstado;
+    int* estado = NULL;
 
     /* Contadores de loop */
     int i, j, k;
@@ -57,22 +61,104 @@ AFND* AFNDMinimiza(AFND* afd){
     }
     dlog("Obtenidos los estados accesibles del afd");
 
-    /* Recorremos todos los estado accesibles del afd para juntar los que sean equivalentes */
-    for (i=0; i < list_size(estados_accesibles); i++){
+    /* Obtenemos el # de estados accesibles del afd */
+    num_estados_accesibles = list_size(estados_accesibles);
+    if (num_estados_accesibles == -1){
+        dlog("ERROR: El tamaño de la lista de estados accesibles no se obtuvo correctamente");
+        list_destroy(estados_accesibles);
+        list_destroy(estados);
+        return NULL;
+    }
+    sprintf(Message, "Número de Estados Accesibles del afd: %d", num_estados_accesibles);
+    dlog(Message);
+
+    /* Creamos una lista de enteros que agrupa los estados finales en una clase */
+    clase_finales = list_ini(int_destroy, int_copy, int_print, int_compare);
+    if (clase_finales == NULL){
+        dlog("ERROR: La lista de estados finales no se creó correctamente");
+        list_destroy(estados_accesibles);
+        list_destroy(estados);
+        return NULL;
+    }
+
+    /* Creamos una lista de enteros que agrupa los estados no finales en una clase */
+    clase_noFinales = list_ini(int_destroy, int_copy, int_print, int_compare);
+    if (clase_noFinales == NULL){
+        dlog("ERROR: La lista de estados no finales no se creó correctamente");
+        list_destroy(clase_finales);
+        list_destroy(estados_accesibles);
+        list_destroy(estados);
+        return NULL;
+    }
+
+    /* Dividimos los estados accesibles en dos clases, estados finales y estados no finales.
+    Esto se debe a que los estados finales son distinguibles de los no finales */
+    for (i=0; i < num_estados_accesibles; i++){
         estado = list_get(estados_accesibles, i);
         if (estado == NULL){
             sprintf(Message, "ERROR: El estado en la posición %d a procesar no se consiguió correctamente", i);
             dlog(Message);
+            list_destroy(clase_noFinales);
+            list_destroy(clase_finales);
             list_destroy(estados_accesibles);
             list_destroy(estados);
             return NULL;
         }
 
+        tipoEstado = AFNDTipoEstadoEn(afd, *estado);
+
+        if (tipoEstado == FINAL || tipoEstado == INICIAL_Y_FINAL){
+            /* Metemos el estado en la clase de estados finales */
+            if (list_insertLast(clase_finales, estado)){
+                sprintf(Message, "ERROR: El estado en la posición %d a no se insertó en la clase finales correctamente", i);
+                dlog(Message);
+                list_destroy(clase_noFinales);
+                list_destroy(clase_finales);
+                list_destroy(estados_accesibles);
+                list_destroy(estados);
+                return NULL;
+            }
+
+        } else {
+            /* Metemos el estado en la clase de estados no finales */
+            if (list_insertLast(clase_noFinales, estado)){
+                sprintf(Message, "ERROR: El estado en la posición %d a no se insertó en la clase no finales correctamente", i);
+                dlog(Message);
+                list_destroy(clase_noFinales);
+                list_destroy(clase_finales);
+                list_destroy(estados_accesibles);
+                list_destroy(estados);
+                return NULL;
+            }
+        }
+    }
+    list_destroy(estados_accesibles);
+
+    /* Insertamos las clases finales y no finales a la lista de estados */
+    if (list_insertLast(estados, clase_noFinales) || list_insertLast(estados, clase_finales)){
+        dlog("ERROR: No se insertaron las clases finales y no finales a lista de estados correctamente");
+        list_destroy(clase_noFinales);
+        list_destroy(clase_finales);
+        list_destroy(estados);
+        return NULL;
+    }
+    list_destroy(clase_noFinales);
+    list_destroy(clase_finales);
+
+    /* Recorremos todas las clases de los estados del afd para juntar los estados equivalentes */
+    for (i=0; i < list_size(estados); i++){
+        clase = list_get(estados, i);
+        if (clase == NULL){
+            sprintf(Message, "ERROR: La clase en la posición %d a procesar no se consiguió correctamente", i);
+            dlog(Message);
+            list_destroy(estados);
+            return NULL;
+        }
+
         for (j=0; j < num_simbolos; j++){
-            for (k=0; k < num_estados; k++){
+            for (k=0; k < num_estados_accesibles; k++){
 
                 /* Vemos si se puede transitar desde el estado en la posición i al k con el símbolo j */
-                if (AFNDTransicionIndicesEstadoiSimboloEstadof(afd, *estado, j, k));
             }
         }
     }
@@ -82,7 +168,6 @@ AFND* AFNDMinimiza(AFND* afd){
     /* Convertimos el afd minimizado de nuestra estructura a la de la librería */
 
     /* Liberamos memoria */
-    list_destroy(estados_accesibles);
     list_destroy(estados);
 
     dlog("\nOK: Afd convertido con éxito");
