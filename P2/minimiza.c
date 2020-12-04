@@ -1,7 +1,8 @@
 #include "minimiza.h"
 
-/* Función que elimina todos los estados inaccesibles de un autómata finito determinista */
-AFND* eliminarEstadosInaccesibles(AFND* afd);
+/* Función que obtiene todos los estados accesibles de un autómata finito determinista,
+descartando así los estados inaccesibles del afd */
+List* obtenerEstadosAccesibles(AFND* afd);
 
 AFND* AFNDMinimiza(AFND* afd){
     /* Afd minimizado */
@@ -10,7 +11,11 @@ AFND* AFNDMinimiza(AFND* afd){
     /* Lista de estados */
     List* estados = NULL;
 
+    /* Lista de enteros */
+    List* estados_accesibles = NULL;
+
     int num_estados, num_simbolos;
+    int *estado = NULL;
 
     /* Contadores de loop */
     int i, j, k;
@@ -43,26 +48,105 @@ AFND* AFNDMinimiza(AFND* afd){
         return NULL;
     }
 
-    /*
-    for (i=0; i < num_estados; i++){
+    /* Obtenemos los estados accesibles del afd, eliminando así los inaccesibles */
+    estados_accesibles = obtenerEstadosAccesibles(afd);
+    if (estados_accesibles == NULL){
+        dlog("ERROR: La lista de estados accesibles no se obtuvo correctamente");
+        list_destroy(estados);
+        return NULL;
+    }
+    dlog("Obtenidos los estados accesibles del afd");
+
+    /* Recorremos todos los estado accesibles del afd para juntar los que sean equivalentes */
+    for (i=0; i < list_size(estados_accesibles); i++){
+        estado = list_get(estados_accesibles, i);
+        if (estado == NULL){
+            sprintf(Message, "ERROR: El estado en la posición %d a procesar no se consiguió correctamente", i);
+            dlog(Message);
+            list_destroy(estados_accesibles);
+            list_destroy(estados);
+            return NULL;
+        }
+
         for (j=0; j < num_simbolos; j++){
             for (k=0; k < num_estados; k++){
-                if (AFNDTransicionIndicesEstadoiSimboloEstadof(afd, i, j, k)){
-                    
-                }
+
+                /* Vemos si se puede transitar desde el estado en la posición i al k con el símbolo j */
+                if (AFNDTransicionIndicesEstadoiSimboloEstadof(afd, *estado, j, k));
             }
         }
     }
-    */
+    dlog("\nOK: Afd minimizado con éxito");
+    dlog("Convirtiendo el afd minimizado a la estructura de la librería...");
+
+    /* Convertimos el afd minimizado de nuestra estructura a la de la librería */
 
     /* Liberamos memoria */
+    list_destroy(estados_accesibles);
     list_destroy(estados);
 
+    dlog("\nOK: Afd convertido con éxito");
     dlog("Termina la ejecución correctamente");
 
     return afd_min;
 }
 
-AFND* eliminarEstadosInaccesibles(AFND* afd){
-    return NULL;
+List* obtenerEstadosAccesibles(AFND* afd){
+    int i, j, k, estado_inicial;
+    int *estado = NULL;
+
+    List *estados_accesibles = NULL;
+
+    /* Control de errores */
+    if (afd == NULL){
+        dlog("ERROR: No se eliminaron los estados inaccesibles del afd correctamente");
+        return NULL;
+    }
+
+    /* Creamos una lista de enteros para guardar los estados accesibles */
+    estados_accesibles = list_ini(int_destroy, int_copy, int_print, int_compare);
+    if (estados_accesibles == NULL){
+        dlog("ERROR: La lista de estados accesibles no se creó correctamente");
+        return NULL;
+    }
+
+    /* Posición en el afd del estado inicial */
+    estado_inicial = AFNDIndiceEstadoInicial(afd);
+
+    /* Marcamos el estado inicial del afd como accesible */
+    if (list_insertLast(estados_accesibles, &estado_inicial)){
+        dlog("ERROR: No se añadió el estado inicial a la lista de estados accesibles correctamente");
+        list_destroy(estados_accesibles);
+        return NULL;
+    }
+
+    /* Vemos todas las transiciones posibles entre estados */
+    for (i=0; i < list_size(estados_accesibles); i++){
+        estado = list_get(estados_accesibles, i);
+        if (estado == NULL) {
+            dlog("ERROR: El estado a analizar su accesibilidad no se consiguió correctamente");
+            list_destroy(estados_accesibles);
+            return NULL;
+        }
+
+        for (j=0; j < AFNDNumSimbolos(afd); j++){
+            for (k=0; k < AFNDNumEstados(afd); k++){
+
+                /* Vemos si se puede transitar desde el estado en la posición i al k con el símbolo j */
+                if (AFNDTransicionIndicesEstadoiSimboloEstadof(afd, *estado, j, k)){
+
+                    /* Marcamos como accesibles los estados a los que podemos transitar y no estén ya en la lista */
+                    if (!list_contains(estados_accesibles, &k)){
+                        if (list_insertLast(estados_accesibles, &k)){
+                            dlog("ERROR: No se añadió un estado a la lista de estados accesibles correctamente");
+                            list_destroy(estados_accesibles);
+                            return NULL;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return estados_accesibles;
 }
