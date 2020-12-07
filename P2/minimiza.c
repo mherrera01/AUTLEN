@@ -8,7 +8,7 @@ List* obtenerEstadosAccesibles(AFND* afd);
 int** matrizTransiciones(AFND* afd);
 /* Función que libera la memoria de la matriz de transiciones */
 void freeMatriz(AFND* afd, int** matriz);
-/* Función que devuelve el índice de la clase a la que pertenece el estado dado. */
+/* Función que devuelve el índice de la clase a la que pertenece el estado dado */
 int getClaseDeEstado(List* clases, int estado);
 
 AFND* AFNDMinimiza(AFND* afd){
@@ -16,24 +16,23 @@ AFND* AFNDMinimiza(AFND* afd){
     AFND* afd_min = NULL;
 
     /* Lista de estados */
-    List* estados = NULL;
+    List* clases = NULL;
 
     /* Lista de enteros */
     List* estados_accesibles = NULL;
     List* clase_finales = NULL;
     List* clase_noFinales = NULL;
     List* clase = NULL;
+    List* nueva_clase = NULL;
 
     int num_estados, num_simbolos, num_estados_accesibles;
     int tipoEstado;
-    int coincidencias;
-    int* estado = NULL, *estado2 = NULL;
+    int* estado = NULL, *aux_estado = NULL;
+    int* simbolosDeClase = NULL;
     int** transiciones = NULL;
 
     /* Contadores de loop */
     int i, j, k, h;
-
-    int* simbolosDeClase;
 
     /* Creamos un archivo txt con mensajes de la ejecución del minimiza */
     dlog_init();
@@ -56,18 +55,10 @@ AFND* AFNDMinimiza(AFND* afd){
     dlog(Message);
     dlog("Minimizando el afd...");
 
-    /* Creamos una lista para todos los estados nuevos del autómata */
-    estados = list_ini(estado_destroy, estado_clone, estado_print, estado_compare);
-    if (estados == NULL){
-        dlog("ERROR: La lista de estados no se creó correctamente");
-        return NULL;
-    }
-
     /* Obtenemos los estados accesibles del afd, eliminando así los inaccesibles */
     estados_accesibles = obtenerEstadosAccesibles(afd);
     if (estados_accesibles == NULL){
         dlog("ERROR: La lista de estados accesibles no se obtuvo correctamente");
-        list_destroy(estados);
         return NULL;
     }
     dlog("Obtenidos los estados accesibles del afd");
@@ -77,18 +68,24 @@ AFND* AFNDMinimiza(AFND* afd){
     if (num_estados_accesibles == -1){
         dlog("ERROR: El tamaño de la lista de estados accesibles no se obtuvo correctamente");
         list_destroy(estados_accesibles);
-        list_destroy(estados);
         return NULL;
     }
     sprintf(Message, "Número de Estados Accesibles del afd: %d", num_estados_accesibles);
     dlog(Message);
+
+    /* Creamos una lista de clases para distinguir los estados del afd */
+    clases = list_ini(estado_destroy, estado_clone, estado_print, estado_compare);
+    if (clases == NULL){
+        dlog("ERROR: La lista de clases no se creó correctamente");
+        return NULL;
+    }
 
     /* Creamos una lista de enteros que agrupa los estados finales en una clase */
     clase_finales = list_ini(int_destroy, int_copy, int_print, int_compare);
     if (clase_finales == NULL){
         dlog("ERROR: La lista de estados finales no se creó correctamente");
         list_destroy(estados_accesibles);
-        list_destroy(estados);
+        list_destroy(clases);
         return NULL;
     }
 
@@ -98,7 +95,7 @@ AFND* AFNDMinimiza(AFND* afd){
         dlog("ERROR: La lista de estados no finales no se creó correctamente");
         list_destroy(clase_finales);
         list_destroy(estados_accesibles);
-        list_destroy(estados);
+        list_destroy(clases);
         return NULL;
     }
 
@@ -112,7 +109,7 @@ AFND* AFNDMinimiza(AFND* afd){
             list_destroy(clase_noFinales);
             list_destroy(clase_finales);
             list_destroy(estados_accesibles);
-            list_destroy(estados);
+            list_destroy(clases);
             return NULL;
         }
 
@@ -126,7 +123,7 @@ AFND* AFNDMinimiza(AFND* afd){
                 list_destroy(clase_noFinales);
                 list_destroy(clase_finales);
                 list_destroy(estados_accesibles);
-                list_destroy(estados);
+                list_destroy(clases);
                 return NULL;
             }
 
@@ -138,19 +135,19 @@ AFND* AFNDMinimiza(AFND* afd){
                 list_destroy(clase_noFinales);
                 list_destroy(clase_finales);
                 list_destroy(estados_accesibles);
-                list_destroy(estados);
+                list_destroy(clases);
                 return NULL;
             }
         }
     }
     list_destroy(estados_accesibles);
 
-    /* Insertamos las clases finales y no finales a la lista de estados */
-    if (list_insertLast(estados, clase_noFinales) || list_insertLast(estados, clase_finales)){
-        dlog("ERROR: No se insertaron las clases finales y no finales a lista de estados correctamente");
+    /* Insertamos las clases finales y no finales a la lista de clases */
+    if (list_insertLast(clases, clase_noFinales) || list_insertLast(clases, clase_finales)){
+        dlog("ERROR: No se insertaron las clases finales y no finales a lista de clases correctamente");
         list_destroy(clase_noFinales);
         list_destroy(clase_finales);
-        list_destroy(estados);
+        list_destroy(clases);
         return NULL;
     }
     list_destroy(clase_noFinales);
@@ -160,24 +157,111 @@ AFND* AFNDMinimiza(AFND* afd){
     transiciones = matrizTransiciones(afd);
     if (transiciones == NULL){
         dlog("ERROR: ");
-        list_destroy(estados);
+        list_destroy(clases);
         return NULL;
     }
 
+    /* Creamos un array de enteros con las clases a las que se puede transitar con los distintos símbolos */
     simbolosDeClase = (int*) malloc (num_simbolos*sizeof(int));
+    if (simbolosDeClase == NULL){
+        freeMatriz(afd, transiciones);
+        list_destroy(clases);
+        return NULL;
+    }
 
     /* Buscamos estados equivalentes y creamos clases con ellos */
-    for(h = 0; h < list_size(estados); h++){
-        for(i = 0; i < num_simbolos; i++){
-            simbolosDeClase[i] = getClaseDeEstado(estados, transiciones[list_get(list_get(estados, h), 0)][i]);
+    for(h = 0; h < list_size(clases); h++){
+
+        /* Obtenemos la clase a procesar por el algoritmo */
+        clase = list_get(clases, h);
+        if (clase == NULL){
+            sprintf(Message, "ERROR: La clase en la posición %d a procesar no se consiguió correctamente", h);
+            dlog(Message);
+            free(simbolosDeClase);
+            freeMatriz(afd, transiciones);
+            list_destroy(clases);
+            return NULL;
         }
-        for(j = 0; j < list_size(list_get(estados, h)); j++){
+
+        /* Obtenemos el primer estado de la clase, considerándolo el dueño de la misma */
+        estado = list_get(clase, 0);
+        if (estado == NULL){
+            sprintf(Message, "ERROR: El primer estado a procesar en la clase %d no se consiguió correctamente", h);
+            dlog(Message);
+            free(simbolosDeClase);
+            freeMatriz(afd, transiciones);
+            list_destroy(clases);
+            return NULL;
+        }
+
+        /* Obtenemos las clases a las que puede transitar el primer estado de la clase */
+        for(i = 0; i < num_simbolos; i++){
+            simbolosDeClase[i] = getClaseDeEstado(clases, transiciones[*estado][i]);
+        }
+
+        for(j = 1; j < list_size(clase); j++){
+
+            /* Obtenemos los estados de la clase */
+            estado = list_get(clase, j);
+            if (estado == NULL){
+                sprintf(Message, "ERROR: El estado en posición %d a procesar en la clase %d no se consiguió correctamente", j, h);
+                dlog(Message);
+                free(simbolosDeClase);
+                freeMatriz(afd, transiciones);
+                list_destroy(clases);
+                return NULL;
+            }
+
             for(i = 0; i < num_simbolos; i++){
-                if(simbolosDeClase[i] == getClaseDeEstado(transiciones[list_get(list_get(estados, h), j)][i])){
-                    /* Este elemento está bien en esta clase. No hacemos nada. */
+                if(simbolosDeClase[i] == getClaseDeEstado(clases, transiciones[*estado][i])){
+                    /* Este elemento está bien en esta clase. No hacemos nada */
                     continue;
                 } else {
-                    
+                    /* Creamos una nueva clase ya que el estado es distinguible */
+                    nueva_clase = list_ini(int_destroy, int_copy, int_print, int_compare);
+                    if (nueva_clase == NULL){
+                        sprintf(Message, "ERROR: La nueva clase para el estado %d no se creó correctamente", *estado);
+                        dlog(Message);
+                        free(simbolosDeClase);
+                        freeMatriz(afd, transiciones);
+                        list_destroy(clases);
+                        return NULL;
+                    }
+
+                    /* Añadimos el estado a la nueva clase */
+                    if (list_insertLast(nueva_clase, estado)){
+                        sprintf(Message, "ERROR: El estado %d no se insertó a la nueva clase correctamente", *estado);
+                        dlog(Message);
+                        free(simbolosDeClase);
+                        freeMatriz(afd, transiciones);
+                        list_destroy(clases);
+                        return NULL;
+                    }
+
+                    /* Añadimos la nueva clase a lista de clases */
+                    if (list_insertLast(clases, nueva_clase)){
+                        sprintf(Message, "ERROR: La nueva clase del estado %d no se insertó a la lista de clases correctamente", *estado);
+                        dlog(Message);
+                        free(simbolosDeClase);
+                        freeMatriz(afd, transiciones);
+                        list_destroy(clases);
+                        return NULL;
+                    }
+                    list_destroy(nueva_clase);
+
+                    /* Borramos el estado de la clase en la que estaba */
+                    aux_estado = list_extractElement(clase, j);
+                    if (aux_estado == NULL){
+                        sprintf(Message, "ERROR: El estado %d no se borró de su antigua clase correctamente", *estado);
+                        dlog(Message);
+                        free(simbolosDeClase);
+                        freeMatriz(afd, transiciones);
+                        list_destroy(clases);
+                        return NULL;
+                    }
+                    int_destroy(aux_estado);
+                    j--;
+
                     break;
                 }
             }
@@ -186,8 +270,6 @@ AFND* AFNDMinimiza(AFND* afd){
 
     free(simbolosDeClase);
 
-    }
-
     dlog("\nOK: Afd minimizado con éxito");
     dlog("Convirtiendo el afd minimizado a la estructura de la librería...");
 
@@ -195,7 +277,7 @@ AFND* AFNDMinimiza(AFND* afd){
 
     /* Liberamos memoria */
     freeMatriz(afd, transiciones);
-    list_destroy(estados);
+    list_destroy(clases);
 
     dlog("\nOK: Afd convertido con éxito");
     dlog("Termina la ejecución correctamente");
@@ -231,7 +313,6 @@ int** matrizTransiciones(AFND* afd){
             for (k = 0; k < AFNDNumEstados(afd); k++){
                 if (AFNDTransicionIndicesEstadoiSimboloEstadof(afd, i, j, k)){
                     matriz[i][j] = k;
-                    printf("%d transita a %d con %d. Como lo oyes.\n", i, matriz[i][j], j);
                 }
             }
         }
@@ -319,9 +400,9 @@ List* obtenerEstadosAccesibles(AFND* afd){
 int getClaseDeEstado(List* clases, int estado){
     int i;
 
-    /*Itera por las clases buscando a qué clase pertenece el estado.*/
+    /* Itera por las clases buscando a qué clase pertenece el estado */
     for(i = 0; i<list_size(clases); i++){
-        if(list_contains(list_get(clases, i), estado)){
+        if(list_contains(list_get(clases, i), &estado)){
             return i;
         }
     }
