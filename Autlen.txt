@@ -1,0 +1,30 @@
+getClaseDeEstado(clases, e){
+    for c in clases{
+        if c contains e{
+            return c // No el puntero, el indice.
+        }
+    }
+    return -1
+}
+
+
+
+
+simbolosDeClase[NumSimbolos] = 0, 4, 4, 1
+
+for c in clases{
+    for s in simbolos{
+        simbolosDeClase[s] = getClaseDeEstado(transiciones[c[0]][s])
+    }
+    for e (-1) in c{
+        for s in simbolos{
+            if simbolosDeClase[NumSimbolos] == getClaseDeEstado(transiciones[e][s]){
+                //Este elemento está bien en esta clase. No hacemos nada.
+            }else{
+                //Crear nueva clase.
+                //Añadimos el estado e a una nueva clase.
+                //borramos el estado e de la clase actual.
+            }
+        }
+    }
+}

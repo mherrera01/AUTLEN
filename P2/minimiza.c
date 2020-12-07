@@ -8,6 +8,8 @@ List* obtenerEstadosAccesibles(AFND* afd);
 int** matrizTransiciones(AFND* afd);
 /* Función que libera la memoria de la matriz de transiciones */
 void freeMatriz(AFND* afd, int** matriz);
+/* Función que devuelve el índice de la clase a la que pertenece el estado dado. */
+int getClaseDeEstado(List* clases, int estado);
 
 AFND* AFNDMinimiza(AFND* afd){
     /* Afd minimizado */
@@ -30,6 +32,8 @@ AFND* AFNDMinimiza(AFND* afd){
 
     /* Contadores de loop */
     int i, j, k, h;
+
+    int* simbolosDeClase;
 
     /* Creamos un archivo txt con mensajes de la ejecución del minimiza */
     dlog_init();
@@ -160,62 +164,28 @@ AFND* AFNDMinimiza(AFND* afd){
         return NULL;
     }
 
-    /* Recorremos todas las clases de los estados del afd para juntar los estados equivalentes */
-    for (i=0; i < list_size(estados); i++){
-        clase = list_get(estados, i);
-        if (clase == NULL){
-            sprintf(Message, "ERROR: La clase en la posición %d a procesar no se consiguió correctamente", i);
-            dlog(Message);
-            freeMatriz(afd, transiciones);
-            list_destroy(estados);
-            return NULL;
+    simbolosDeClase = (int*) malloc (num_simbolos*sizeof(int));
+
+    /* Buscamos estados equivalentes y creamos clases con ellos */
+    for(h = 0; h < list_size(estados); h++){
+        for(i = 0; i < num_simbolos; i++){
+            simbolosDeClase[i] = getClaseDeEstado(estados, transiciones[list_get(list_get(estados, h), 0)][i]);
         }
-
-        /*
-        A ->
-        B -> A
-        C -> A B
-        D -> A B C
-        */
-
-        /* Comprobamos si los estados son equivalentes, viendo que desde cada clase se puede transitar a elementos de la misma clase */
-        for (k=0; k < list_size(clase); k++){
-            estado = list_get(clase, k);
-            if (estado == NULL){
-                sprintf(Message, "ERROR: El estado de la clase %d en la posición %d a procesar no se consiguió correctamente", i, k);
-                dlog(Message);
-                freeMatriz(afd, transiciones);
-                list_destroy(estados);
-                return NULL;
-            }
-
-            for (h = k-1; h >= 0; h--){
-                estado2 = list_get(clase, h);
-                if (estado2 == NULL){
-                    sprintf(Message, "ERROR: El estado de la clase %d en la posición %d a procesar no se consiguió correctamente", i, h);
-                    dlog(Message);
-                    freeMatriz(afd, transiciones);
-                    list_destroy(estados);
-                    return NULL;
+        for(j = 0; j < list_size(list_get(estados, h)); j++){
+            for(i = 0; i < num_simbolos; i++){
+                if(simbolosDeClase[i] == getClaseDeEstado(transiciones[list_get(list_get(estados, h), j)][i])){
+                    /* Este elemento está bien en esta clase. No hacemos nada. */
+                    continue;
+                } else {
+                    
+                    break;
                 }
-
-                coincidencias = 0;
-                for (j=0; j < num_simbolos; j++){
-                    /*
-                    [A B C D] - [E, F] [G, H]
-
-                    A --> 0 B
-                    B --> 0 C
-                    */
-                    if (transiciones[*estado][j] == transiciones[*estado2][j]){
-                        coincidencias++;                        
-                    }
-                }
-
-                /* Son la misma clase */
-                if(num_simbolos == coincidencias);
             }
         }
+    }
+
+    free(simbolosDeClase);
+
     }
 
     dlog("\nOK: Afd minimizado con éxito");
@@ -344,4 +314,16 @@ List* obtenerEstadosAccesibles(AFND* afd){
     }
 
     return estados_accesibles;
+}
+
+int getClaseDeEstado(List* clases, int estado){
+    int i;
+
+    /*Itera por las clases buscando a qué clase pertenece el estado.*/
+    for(i = 0; i<list_size(clases); i++){
+        if(list_contains(list_get(clases, i), estado)){
+            return i;
+        }
+    }
+    return -1;
 }
