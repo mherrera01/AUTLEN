@@ -169,13 +169,12 @@ AFND* AFNDMinimiza(AFND* afd){
         return NULL;
     }
 
-    /* Buscamos estados equivalentes y creamos clases con ellos */
-    for(h = 0; h < list_size(clases); h++){
+    for(k = 0; k < 100; k++){
 
-        /* Obtenemos la clase a procesar por el algoritmo */
-        clase = list_get(clases, h);
-        if (clase == NULL){
-            sprintf(Message, "ERROR: La clase en la posición %d a procesar no se consiguió correctamente", h);
+        /* Creamos una nueva clase para los estados diferenciables. */
+        nueva_clase = list_ini(int_destroy, int_copy, int_print, int_compare);
+        if (nueva_clase == NULL){
+            sprintf(Message, "ERROR: La nueva clase para el estado %d no se creó correctamente", *estado);
             dlog(Message);
             free(simbolosDeClase);
             freeMatriz(afd, transiciones);
@@ -183,28 +182,13 @@ AFND* AFNDMinimiza(AFND* afd){
             return NULL;
         }
 
-        /* Obtenemos el primer estado de la clase, considerándolo el dueño de la misma */
-        estado = list_get(clase, 0);
-        if (estado == NULL){
-            sprintf(Message, "ERROR: El primer estado a procesar en la clase %d no se consiguió correctamente", h);
-            dlog(Message);
-            free(simbolosDeClase);
-            freeMatriz(afd, transiciones);
-            list_destroy(clases);
-            return NULL;
-        }
+        /* Buscamos estados equivalentes y creamos clases con ellos */
+        for(h = 0; h < list_size(clases); h++){
 
-        /* Obtenemos las clases a las que puede transitar el primer estado de la clase */
-        for(i = 0; i < num_simbolos; i++){
-            simbolosDeClase[i] = getClaseDeEstado(clases, transiciones[*estado][i]);
-        }
-
-        for(j = 1; j < list_size(clase); j++){
-
-            /* Obtenemos los estados de la clase */
-            estado = list_get(clase, j);
-            if (estado == NULL){
-                sprintf(Message, "ERROR: El estado en posición %d a procesar en la clase %d no se consiguió correctamente", j, h);
+            /* Obtenemos la clase a procesar por el algoritmo */
+            clase = list_get(clases, h);
+            if (clase == NULL){
+                sprintf(Message, "ERROR: La clase en la posición %d a procesar no se consiguió correctamente", h);
                 dlog(Message);
                 free(simbolosDeClase);
                 freeMatriz(afd, transiciones);
@@ -212,61 +196,83 @@ AFND* AFNDMinimiza(AFND* afd){
                 return NULL;
             }
 
+            /* Obtenemos el primer estado de la clase, considerándolo el dueño de la misma */
+            estado = list_get(clase, 0);
+            if (estado == NULL){
+                sprintf(Message, "ERROR: El primer estado a procesar en la clase %d no se consiguió correctamente", h);
+                dlog(Message);
+                free(simbolosDeClase);
+                freeMatriz(afd, transiciones);
+                list_destroy(clases);
+                return NULL;
+            }
+
+            /* Obtenemos las clases a las que puede transitar el primer estado de la clase */
             for(i = 0; i < num_simbolos; i++){
-                if(simbolosDeClase[i] == getClaseDeEstado(clases, transiciones[*estado][i])){
-                    /* Este elemento está bien en esta clase. No hacemos nada */
-                    continue;
-                } else {
-                    /* Creamos una nueva clase ya que el estado es distinguible */
-                    nueva_clase = list_ini(int_destroy, int_copy, int_print, int_compare);
-                    if (nueva_clase == NULL){
-                        sprintf(Message, "ERROR: La nueva clase para el estado %d no se creó correctamente", *estado);
-                        dlog(Message);
-                        free(simbolosDeClase);
-                        freeMatriz(afd, transiciones);
-                        list_destroy(clases);
-                        return NULL;
-                    }
+                simbolosDeClase[i] = getClaseDeEstado(clases, transiciones[*estado][i]);
+            }
 
-                    /* Añadimos el estado a la nueva clase */
-                    if (list_insertLast(nueva_clase, estado)){
-                        sprintf(Message, "ERROR: El estado %d no se insertó a la nueva clase correctamente", *estado);
-                        dlog(Message);
-                        free(simbolosDeClase);
-                        freeMatriz(afd, transiciones);
-                        list_destroy(clases);
-                        return NULL;
-                    }
+            for(j = 1; j < list_size(clase); j++){
 
-                    /* Añadimos la nueva clase a lista de clases */
-                    if (list_insertLast(clases, nueva_clase)){
-                        sprintf(Message, "ERROR: La nueva clase del estado %d no se insertó a la lista de clases correctamente", *estado);
-                        dlog(Message);
-                        free(simbolosDeClase);
-                        freeMatriz(afd, transiciones);
-                        list_destroy(clases);
-                        return NULL;
-                    }
-                    list_destroy(nueva_clase);
+                /* Obtenemos los estados de la clase */
+                estado = list_get(clase, j);
+                if (estado == NULL){
+                    sprintf(Message, "ERROR: El estado en posición %d a procesar en la clase %d no se consiguió correctamente", j, h);
+                    dlog(Message);
+                    free(simbolosDeClase);
+                    freeMatriz(afd, transiciones);
+                    list_destroy(clases);
+                    return NULL;
+                }
 
-                    /* Borramos el estado de la clase en la que estaba */
-                    aux_estado = list_extractElement(clase, j);
-                    if (aux_estado == NULL){
-                        sprintf(Message, "ERROR: El estado %d no se borró de su antigua clase correctamente", *estado);
-                        dlog(Message);
-                        free(simbolosDeClase);
-                        freeMatriz(afd, transiciones);
-                        list_destroy(clases);
-                        return NULL;
-                    }
-                    int_destroy(aux_estado);
-                    j--;
+                for(i = 0; i < num_simbolos; i++){
+                    if(simbolosDeClase[i] == getClaseDeEstado(clases, transiciones[*estado][i])){
+                        /* Este elemento está bien en esta clase. No hacemos nada */
+                        continue;
+                    } else {
 
-                    break;
+                        /* Añadimos el estado a la nueva clase */
+                        if (list_insertLast(nueva_clase, estado)){
+                            sprintf(Message, "ERROR: El estado %d no se insertó a la nueva clase correctamente", *estado);
+                            dlog(Message);
+                            free(simbolosDeClase);
+                            freeMatriz(afd, transiciones);
+                            list_destroy(clases);
+                            return NULL;
+                        }
+
+                        /* Borramos el estado de la clase en la que estaba */
+                        aux_estado = list_extractElement(clase, j);
+                        
+                        if (aux_estado == NULL){
+                            sprintf(Message, "ERROR: El estado %d no se borró de su antigua clase correctamente", *estado);
+                            dlog(Message);
+                            free(simbolosDeClase);
+                            freeMatriz(afd, transiciones);
+                            list_destroy(clases);
+                            return NULL;
+                        }
+
+                        int_destroy(aux_estado);
+                        /* j--; Esto no creo que sea correcto. ASK MIGUEL */
+
+                        break;
+                    }
                 }
             }
+
+            /* Añadimos la nueva clase a lista de clases */
+            if (list_insertLast(clases, nueva_clase)){
+                sprintf(Message, "ERROR: La nueva clase del estado %d no se insertó a la lista de clases correctamente", *estado);
+                dlog(Message);
+                free(simbolosDeClase);
+                freeMatriz(afd, transiciones);
+                list_destroy(clases);
+                return NULL;
+            }
+
+            list_destroy(nueva_clase);
         }
-    }
 
     free(simbolosDeClase);
 
