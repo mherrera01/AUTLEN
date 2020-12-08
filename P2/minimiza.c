@@ -8,8 +8,14 @@ List* obtenerEstadosAccesibles(AFND* afd);
 int** matrizTransiciones(AFND* afd);
 /* Función que libera la memoria de la matriz de transiciones */
 void freeMatriz(AFND* afd, int** matriz);
+
 /* Función que devuelve el índice de la clase a la que pertenece el estado dado */
 int getClaseDeEstado(List* clases, int estado);
+
+/* Función que compara dos listas de clases y devuelve 0 en caso de que sean iguales */
+int compararListaClases(List* c1, List* c2);
+/* Función que devuelve una copia de una lista de clases */
+List* copiarListaClases(List* c1);
 
 AFND* AFNDMinimiza(AFND* afd){
     /* Afd minimizado */
@@ -17,6 +23,7 @@ AFND* AFNDMinimiza(AFND* afd){
 
     /* Lista de estados */
     List* clases = NULL;
+    List* clases_anteriores = NULL;
 
     /* Lista de enteros */
     List* estados_accesibles = NULL;
@@ -32,7 +39,7 @@ AFND* AFNDMinimiza(AFND* afd){
     int** transiciones = NULL;
 
     /* Contadores de loop */
-    int i, j, k, h;
+    int i, j, h;
 
     /* Creamos un archivo txt con mensajes de la ejecución del minimiza */
     dlog_init();
@@ -169,13 +176,26 @@ AFND* AFNDMinimiza(AFND* afd){
         return NULL;
     }
 
-    for(k = 0; k < 100; k++){
+    /* Repite el algoritmo hasta que las clases sean iguales*/
+    while(compararListaClases(clases, clases_anteriores) != 0){
 
-        /* Creamos una nueva clase para los estados diferenciables. */
+        list_destroy(clases_anteriores);
+
+        /* Guardamos el estado de la lista de clases para saber si cambia en esta iteración */
+        clases_anteriores = copiarListaClases(clases);
+        if (clases_anteriores == NULL){
+            dlog("ERROR: La lista clases_anteriores para los estados diferenciables no se copió correctamente");
+            free(simbolosDeClase);
+            freeMatriz(afd, transiciones);
+            list_destroy(clases);
+            return NULL;
+        }
+
+        /* Creamos una nueva clase para los estados diferenciables */
         nueva_clase = list_ini(int_destroy, int_copy, int_print, int_compare);
         if (nueva_clase == NULL){
-            sprintf(Message, "ERROR: La nueva clase para el estado %d no se creó correctamente", *estado);
-            dlog(Message);
+            dlog("ERROR: La nueva clase para los estados diferenciables no se creó correctamente");
+            list_destroy(clases_anteriores);
             free(simbolosDeClase);
             freeMatriz(afd, transiciones);
             list_destroy(clases);
@@ -184,12 +204,12 @@ AFND* AFNDMinimiza(AFND* afd){
 
         /* Buscamos estados equivalentes y creamos clases con ellos */
         for(h = 0; h < list_size(clases); h++){
-
             /* Obtenemos la clase a procesar por el algoritmo */
             clase = list_get(clases, h);
             if (clase == NULL){
                 sprintf(Message, "ERROR: La clase en la posición %d a procesar no se consiguió correctamente", h);
                 dlog(Message);
+                list_destroy(clases_anteriores);
                 free(simbolosDeClase);
                 freeMatriz(afd, transiciones);
                 list_destroy(clases);
@@ -201,6 +221,7 @@ AFND* AFNDMinimiza(AFND* afd){
             if (estado == NULL){
                 sprintf(Message, "ERROR: El primer estado a procesar en la clase %d no se consiguió correctamente", h);
                 dlog(Message);
+                list_destroy(clases_anteriores);
                 free(simbolosDeClase);
                 freeMatriz(afd, transiciones);
                 list_destroy(clases);
@@ -219,6 +240,7 @@ AFND* AFNDMinimiza(AFND* afd){
                 if (estado == NULL){
                     sprintf(Message, "ERROR: El estado en posición %d a procesar en la clase %d no se consiguió correctamente", j, h);
                     dlog(Message);
+                    list_destroy(clases_anteriores);
                     free(simbolosDeClase);
                     freeMatriz(afd, transiciones);
                     list_destroy(clases);
@@ -235,6 +257,7 @@ AFND* AFNDMinimiza(AFND* afd){
                         if (list_insertLast(nueva_clase, estado)){
                             sprintf(Message, "ERROR: El estado %d no se insertó a la nueva clase correctamente", *estado);
                             dlog(Message);
+                            list_destroy(clases_anteriores);
                             free(simbolosDeClase);
                             freeMatriz(afd, transiciones);
                             list_destroy(clases);
@@ -247,34 +270,40 @@ AFND* AFNDMinimiza(AFND* afd){
                         if (aux_estado == NULL){
                             sprintf(Message, "ERROR: El estado %d no se borró de su antigua clase correctamente", *estado);
                             dlog(Message);
+                            list_destroy(clases_anteriores);
                             free(simbolosDeClase);
                             freeMatriz(afd, transiciones);
                             list_destroy(clases);
                             return NULL;
                         }
-
                         int_destroy(aux_estado);
-                        /* j--; Esto no creo que sea correcto. ASK MIGUEL */
+                        j--;
 
                         break;
                     }
                 }
             }
+        }
 
-            /* Añadimos la nueva clase a lista de clases */
+        /* Añadimos la nueva clase a lista de clases */
+        if(list_size(nueva_clase) != 0){
             if (list_insertLast(clases, nueva_clase)){
-                sprintf(Message, "ERROR: La nueva clase del estado %d no se insertó a la lista de clases correctamente", *estado);
-                dlog(Message);
+                dlog("ERROR: La nueva clase no se insertó a la lista de clases correctamente");
+                list_destroy(clases_anteriores);
                 free(simbolosDeClase);
                 freeMatriz(afd, transiciones);
                 list_destroy(clases);
                 return NULL;
             }
-
-            list_destroy(nueva_clase);
         }
 
+        list_destroy(nueva_clase);
+
+    }
+
     free(simbolosDeClase);
+    list_destroy(clases_anteriores);
+    freeMatriz(afd, transiciones);
 
     dlog("\nOK: Afd minimizado con éxito");
     dlog("Convirtiendo el afd minimizado a la estructura de la librería...");
@@ -282,7 +311,6 @@ AFND* AFNDMinimiza(AFND* afd){
     /* Convertimos el afd minimizado de nuestra estructura a la de la librería */
 
     /* Liberamos memoria */
-    freeMatriz(afd, transiciones);
     list_destroy(clases);
 
     dlog("\nOK: Afd convertido con éxito");
@@ -413,4 +441,49 @@ int getClaseDeEstado(List* clases, int estado){
         }
     }
     return -1;
+}
+
+int compararListaClases(List* c1, List* c2){
+    int i;
+
+    if(!c1 || !c2){
+        return 2;
+    }
+
+    /* Comprobamos que el tamaño de las listas son iguales */
+    if(list_size(c1) != list_size(c2)){
+        return 1;
+    }
+
+    for (i=0; i < list_size(c1); i++){
+        if(estado_compare(list_get(c1, i), list_get(c2, i)) != 0){
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+List* copiarListaClases(List* c1){
+    List* nueva = NULL;
+    int i;
+
+    if(!c1){
+        return NULL;
+    }
+
+    /* Creamos una nueva lista donde guardaremos la copia */
+    nueva = list_ini(estado_destroy, estado_clone, estado_print, estado_compare);
+    if (nueva == NULL){
+        return NULL;
+    }
+
+    /* Copiamos la lista de clases dada */
+    for (i=0; i < list_size(c1); i++){
+        if(list_insertLast(nueva, list_get(c1, i))){
+            return NULL;
+        }
+    }
+
+    return nueva;
 }

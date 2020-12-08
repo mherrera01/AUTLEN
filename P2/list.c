@@ -42,9 +42,9 @@ List* list_ini (destroy_element_function_type f1, copy_element_function_type f2,
 
 /* Frees the list, freeing all its elements. */
 void list_destroy (List* list){
+    if(!list) return;
     NodeList* nlpointer = list->last, *paux = NULL;
     int i, times;
-    if(!list) return;
     times = list_size(list);
     for(i=0; i<times; i++){
         paux = nlpointer->next;
@@ -270,10 +270,11 @@ void* list_get (const List* list, int index){
 
 /* Returns the number of elements in a list. */
 int list_size (const List* list){
+    if(!list) return -1;
     NodeList *aux = list->last;
     int i = 0;
     if (aux == NULL)
-        return -1;
+        return 0;
     do {
         i++;
         aux = aux->next;
