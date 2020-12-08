@@ -200,6 +200,52 @@ void * list_extractLast (List* list){
     return pelem;
 }
 
+/* Extracts the element in the position given from the list, directly returning the pointer to the info field of the extracted node,
+node that is finally released. BEWARE: after saving the address of the info field to be returned and before releasing the node, it sets the info
+field of the node to NULL, so that it does not continue pointing to the info to be returned and, therefore, does not release it
+when releasing the node */
+void * list_extractElement (List* list, int index){
+    NodeList *aux = NULL, *paux = NULL;
+    int i=-1;
+    void *pelem = NULL;
+
+    if (!list) return NULL;
+    if (list_isEmpty(list) || index > list_size(list)) return NULL;
+
+    /* Gets the element of the list */
+    aux = list->last;
+    do {
+        i++;
+        aux = aux->next;
+    } while ((aux != list->last) && (i<index));
+
+    if (i==index){
+        pelem = aux->info;
+        aux->info = NULL;
+
+        /* Checks if there is only one element in the list */
+        if (list->last->next == list->last) {
+            list->destroy_element_function(list->last);
+            list->last = NULL;
+            return pelem;
+        }
+
+        /* Gets the previous element to the one given */
+        for (paux=list->last; paux->next!=aux; paux=paux->next);
+
+        paux->next = aux->next;
+
+        if (aux == list->last){
+            list->last = paux;
+        }
+        list->destroy_element_function(aux);
+
+        return pelem;
+    }
+
+    return NULL;
+}
+
 /* Checks if a list is empty or not. */
 int list_isEmpty (const List* list){
     if (!list) return 1;
@@ -254,7 +300,7 @@ int list_print (FILE *fd, const List* list){
 
 }
 
-/* Returns 1 if the element is contained in the list. */
+/* Returns 1 if the element is contained in the list */
 int list_contains (List* list, void* element){
     int i;
 

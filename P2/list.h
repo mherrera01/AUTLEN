@@ -35,6 +35,11 @@ released. BEWARE: after saving the address of the info field to be returned and 
 field of the node to NULL, so that it does not continue pointing to the info to be returned and, therefore, does not release it
 when releasing the node */
 void * list_extractLast (List* list);
+/* Extracts the element in the position given from the list, directly returning the pointer to the info field of the extracted node,
+node that is finally released. BEWARE: after saving the address of the info field to be returned and before releasing the node, it sets the info
+field of the node to NULL, so that it does not continue pointing to the info to be returned and, therefore, does not release it
+when releasing the node */
+void * list_extractElement (List* list, int index);
 /* Checks if a list is empty or not. */
 int list_isEmpty (const List* list);
 /* Returns the information stored in the i-th node of the list. In case of error, returns NULL. */
