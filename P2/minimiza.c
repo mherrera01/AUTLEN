@@ -20,6 +20,11 @@ List* copiarListaClases(List* c1);
 AFND* AFNDMinimiza(AFND* afd){
     /* Afd minimizado */
     AFND* afd_min = NULL;
+    int afd_min_num_estados;
+    char afd_nombre_estado[50];
+    char afd_anhadir_nombre[50];
+    char *afd_nombre_origen, *afd_nombre_destino, *afd_nombre_simbolo;
+    int *afd_origen, *afd_destino, *afd_simbolo;
 
     /* Lista de estados */
     List* clases = NULL;
@@ -31,9 +36,15 @@ AFND* AFNDMinimiza(AFND* afd){
     List* clase_noFinales = NULL;
     List* clase = NULL;
     List* nueva_clase = NULL;
+    List* antigua_clase = NULL;
+
+    /* Lista de enteros correspondiente al manejo de las transiciones */
+    List* transiciones_origen = NULL;
+    List* transiciones_destino = NULL;
+    List* transiciones_simbolo = NULL;
 
     int num_estados, num_simbolos, num_estados_accesibles;
-    int tipoEstado;
+    int tipoEstado, origen_pos, destino_pos;
     int* estado = NULL, *aux_estado = NULL;
     int* simbolosDeClase = NULL;
     int** transiciones = NULL;
@@ -176,9 +187,8 @@ AFND* AFNDMinimiza(AFND* afd){
         return NULL;
     }
 
-    /* Repite el algoritmo hasta que las clases sean iguales*/
+    /* Repite el algoritmo hasta que las clases sean iguales y guardamos en una lista los nuevos estados */
     while(compararListaClases(clases, clases_anteriores) != 0){
-
         list_destroy(clases_anteriores);
 
         /* Guardamos el estado de la lista de clases para saber si cambia en esta iteración */
@@ -252,7 +262,6 @@ AFND* AFNDMinimiza(AFND* afd){
                         /* Este elemento está bien en esta clase. No hacemos nada */
                         continue;
                     } else {
-
                         /* Añadimos el estado a la nueva clase */
                         if (list_insertLast(nueva_clase, estado)){
                             sprintf(Message, "ERROR: El estado %d no se insertó a la nueva clase correctamente", *estado);
@@ -264,25 +273,50 @@ AFND* AFNDMinimiza(AFND* afd){
                             return NULL;
                         }
 
-                        /* Borramos el estado de la clase en la que estaba */
-                        aux_estado = list_extractElement(clase, j);
-                        
-                        if (aux_estado == NULL){
-                            sprintf(Message, "ERROR: El estado %d no se borró de su antigua clase correctamente", *estado);
-                            dlog(Message);
-                            list_destroy(clases_anteriores);
-                            free(simbolosDeClase);
-                            freeMatriz(afd, transiciones);
-                            list_destroy(clases);
-                            return NULL;
-                        }
-                        int_destroy(aux_estado);
-                        j--;
-
                         break;
                     }
                 }
             }
+        }
+
+        /* Borramos los estados que ya han sido movidos a la nueva clase de la clase en la que estaban */
+        for(j = 0; j<list_size(nueva_clase); j++){
+            /* Obtenemos los estados que han sido movidos a la nueva clase */
+            estado = list_get(nueva_clase, j);
+            if (estado == NULL){
+                sprintf(Message, "ERROR: El estado en posición %d a procesar en la nueva clase no se consiguió correctamente", j);
+                dlog(Message);
+                list_destroy(clases_anteriores);
+                free(simbolosDeClase);
+                freeMatriz(afd, transiciones);
+                list_destroy(clases);
+                return NULL;
+            }
+
+            /* Obtenemos la clase de la que vamos a borrar cada estado que se ha cambiado de clase */
+            antigua_clase = list_get(clases, getClaseDeEstado(clases, *estado));
+            if (antigua_clase == NULL){
+                sprintf(Message, "ERROR: La antigua clase del estado %d a procesar en la nueva clase no se consiguió correctamente", *estado);
+                dlog(Message);
+                list_destroy(clases_anteriores);
+                free(simbolosDeClase);
+                freeMatriz(afd, transiciones);
+                list_destroy(clases);
+                return NULL;
+            }
+
+            /* Borramos el estado de la clase en la que estaba */
+            aux_estado = list_extractElement(antigua_clase, list_getIndex(antigua_clase, estado));
+            if (aux_estado == NULL){
+                sprintf(Message, "ERROR: El estado %d no se borró de su antigua clase correctamente", *estado);
+                dlog(Message);
+                list_destroy(clases_anteriores);
+                free(simbolosDeClase);
+                freeMatriz(afd, transiciones);
+                list_destroy(clases);
+                return NULL;
+            }
+            int_destroy(aux_estado);
         }
 
         /* Añadimos la nueva clase a lista de clases */
@@ -301,16 +335,231 @@ AFND* AFNDMinimiza(AFND* afd){
 
     }
 
+    /* Liberamos memoria */
     free(simbolosDeClase);
     list_destroy(clases_anteriores);
+
+    /* Con los estados equivalentes obtenidos, hallamos sus transiciones */
+    dlog("Estados equivalentes del afd obtenidos y agrupados");
+
+    /* Creamos una lista de enteros para las transiciones origen */
+    transiciones_origen = list_ini(int_destroy, int_copy, int_print, int_compare);
+    if (transiciones_origen == NULL){
+        dlog("ERROR: La lista de las transiciones origen no se creó correctamente");
+        list_destroy(clases);
+        freeMatriz(afd, transiciones);
+        return NULL;
+    }
+
+    /* Creamos una lista de enteros para las transiciones destino */
+    transiciones_destino = list_ini(int_destroy, int_copy, int_print, int_compare);
+    if (transiciones_destino == NULL){
+        dlog("ERROR: La lista de las transiciones destino no se creó correctamente");
+        list_destroy(transiciones_origen);
+        list_destroy(clases);
+        freeMatriz(afd, transiciones);
+        return NULL;
+    }
+
+    /* Creamos una lista de enteros para los símbolos de las transiciones */
+    transiciones_simbolo = list_ini(int_destroy, int_copy, int_print, int_compare);
+    if (transiciones_simbolo == NULL){
+        dlog("ERROR: La lista de los símbolos de las transiciones no se creó correctamente");
+        list_destroy(transiciones_origen);
+        list_destroy(transiciones_destino);
+        freeMatriz(afd, transiciones);
+        list_destroy(clases);
+        return NULL;
+    }
+    dlog("Listas creadas para las transiciones");
+
+    /* Recorremos la lista de clases para procesar sus transiciones */
+    for (i=0; i < list_size(clases); i++){
+        clase = list_get(clases, i);
+        if (clase == NULL){
+            sprintf(Message, "ERROR: La clase en la posición %d a procesar no se consiguió correctamente", i);
+            dlog(Message);
+            list_destroy(transiciones_origen);
+            list_destroy(transiciones_destino);
+            list_destroy(transiciones_simbolo);
+            freeMatriz(afd, transiciones);
+            list_destroy(clases);
+            return NULL;
+        }
+        sprintf(Message, "\nProcesando transiciones de la clase en posición %d...", i);
+        dlog(Message);
+
+        /* Obtenemos el primer estado de la clase, considerándolo el dueño de la misma */
+        estado = list_get(clase, 0);
+        if (estado == NULL){
+            sprintf(Message, "ERROR: El primer estado a procesar en la clase %d no se consiguió correctamente", i);
+            dlog(Message);
+            list_destroy(transiciones_origen);
+            list_destroy(transiciones_destino);
+            list_destroy(transiciones_simbolo);
+            freeMatriz(afd, transiciones);
+            list_destroy(clases);
+            return NULL;
+        }
+
+        /* Incluimos las transiciones con cada símbolo de la clase */
+        for (j=0; j < num_simbolos; j++){
+
+            /* Añadimos la transición a la clase que estamos procesando */
+
+            /* Añadimos la transición origen que corresponde a la clase en la que estamos ahora */
+            origen_pos = list_getIndex(clases, clase);
+            if (list_insertLast(transiciones_origen, &origen_pos)){
+                sprintf(Message, "ERROR: No se añadió la transición origen en el índice %d a la lista correctamente", origen_pos);
+                dlog(Message);
+                list_destroy(transiciones_origen);
+                list_destroy(transiciones_destino);
+                list_destroy(transiciones_simbolo);
+                freeMatriz(afd, transiciones);
+                list_destroy(clases);
+                return NULL;
+            }
+
+            /* Añadimos la transición destino que corresponde a la clase a la que llegamos con el símbolo j */
+            destino_pos = getClaseDeEstado(clases, transiciones[*estado][j]);
+            if (list_insertLast(transiciones_destino, &destino_pos)){
+                sprintf(Message, "ERROR: No se añadió la transición destino en el índice %d a la lista correctamente", destino_pos);
+                dlog(Message);
+                list_destroy(transiciones_origen);
+                list_destroy(transiciones_destino);
+                list_destroy(transiciones_simbolo);
+                freeMatriz(afd, transiciones);
+                list_destroy(clases);
+                return NULL;
+            }
+
+            /* Añadimos el símbolo de la transición que corresponde al símbolo j */
+            if (list_insertLast(transiciones_simbolo, &j)){
+                sprintf(Message, "ERROR: No se añadió el símbolo %s de la transición a la lista correctamente", AFNDSimboloEn(afd, j));
+                dlog(Message);
+                list_destroy(transiciones_origen);
+                list_destroy(transiciones_destino);
+                list_destroy(transiciones_simbolo);
+                freeMatriz(afd, transiciones);
+                list_destroy(clases);
+                return NULL;
+            }
+            sprintf(Message, "Transición con el símbolo %s añadida a la lista de transiciones", AFNDSimboloEn(afd, j));
+            dlog(Message);
+        }
+        dlog("OK");
+    }
     freeMatriz(afd, transiciones);
 
     dlog("\nOK: Afd minimizado con éxito");
     dlog("Convirtiendo el afd minimizado a la estructura de la librería...");
 
     /* Convertimos el afd minimizado de nuestra estructura a la de la librería */
+    afd_min_num_estados = list_size(clases);
+    if (afd_min_num_estados == -1){
+        dlog("ERROR: No se obtuvo el número de estados del afd minimizado correctamente");
+        list_destroy(transiciones_origen);
+        list_destroy(transiciones_destino);
+        list_destroy(transiciones_simbolo);
+        list_destroy(clases);
+        return NULL;
+    }
+    sprintf(Message, "Número de Estados del afd minimizado: %d", afd_min_num_estados);
+    dlog(Message);
+
+    /* Creamos el afd minimizado */
+    afd_min = AFNDNuevo("afd_minimizado", afd_min_num_estados, num_simbolos);
+    dlog("Afd minimizado creado");
+
+    /* Insertamos los símbolos al afd minimizado (que son los mismos que los del afd sin minimizar) */
+    for (i=0; i < num_simbolos; i++){
+        AFNDInsertaSimbolo(afd_min, AFNDSimboloEn(afd, i));
+    }
+    dlog("Símbolos insertados al afd minimizado");
+    dlog("Insertando los estados al afd minimizado...\n");
+
+    /* Insertamos los estados al afd minimizado */
+    for (i=0; i < afd_min_num_estados; i++){
+        /* Obtenemos la clase por la que está compuesto el estado del afd minimizado en la posición i */
+        clase = list_get(clases, i);
+        if (clase == NULL){
+            sprintf(Message, "ERROR: La clase en la posición %d no se consiguió correctamente", i);
+            dlog(Message);
+            list_destroy(transiciones_origen);
+            list_destroy(transiciones_destino);
+            list_destroy(transiciones_simbolo);
+            list_destroy(clases);
+            return NULL;
+        }
+        sprintf(Message, "Insertando la clase en posición %d...", i);
+        dlog(Message);
+
+        /* Obtenemos el tipo de estado y el nombre a insertar en el afd minimizado */
+        afd_nombre_estado[0] = '\0';
+        tipoEstado = NORMAL;
+        for (j=0; j < list_size(clase); j++){
+            estado = list_get(clase, j);
+
+            /* Concatenación del nombre de los estados que componen la clase del afd minimizado */
+            strcpy(afd_anhadir_nombre, AFNDNombreEstadoEn(afd, *estado));
+            strcat(afd_nombre_estado, afd_anhadir_nombre);
+
+            /* Obtenemos el tipo de estado */
+            if (AFNDTipoEstadoEn(afd, *estado) == INICIAL_Y_FINAL){
+                tipoEstado = INICIAL_Y_FINAL;
+            } else if (AFNDTipoEstadoEn(afd, *estado) == FINAL){
+                if (tipoEstado == INICIAL_Y_FINAL) continue;
+                tipoEstado = FINAL;
+            } else if (AFNDTipoEstadoEn(afd, *estado) == INICIAL){
+                tipoEstado = INICIAL;
+            }
+        }
+        sprintf(Message, "Nombre concatenado: %s", afd_nombre_estado);
+        dlog(Message);
+        sprintf(Message, "Tipo de estado obtenido: %d", tipoEstado);
+        dlog(Message);
+
+        /* Insertamos el estado al afd minimizado */
+        AFNDInsertaEstado(afd_min, afd_nombre_estado, tipoEstado);
+        dlog("OK\n");
+    }
+    dlog("OK: Estados insertados al afd minimizado con éxito");
+    dlog("Insertando las transiciones al afd minimizado...\n");
+
+    /* Insertamos las transiciones al afd minimizado */
+    for(i=0; i < list_size(transiciones_origen); i++){
+        sprintf(Message, "Insertando la transición en posición %d...", i);
+        dlog(Message);
+
+        /* Transición origen en la posición i */
+        afd_origen = list_get(transiciones_origen, i);
+        afd_nombre_origen = AFNDNombreEstadoEn(afd_min, *afd_origen);
+
+        /* Transición destino en la posición i */
+        afd_destino = list_get(transiciones_destino, i);
+        afd_nombre_destino = AFNDNombreEstadoEn(afd_min, *afd_destino);
+
+        /* Símbolo de la transición en la posición i */
+        afd_simbolo = list_get(transiciones_simbolo, i);
+        afd_nombre_simbolo = AFNDSimboloEn(afd_min, *afd_simbolo);
+
+        sprintf(Message, "Transición origen: %s", afd_nombre_origen);
+        dlog(Message);
+        sprintf(Message, "Transición destino: %s", afd_nombre_destino);
+        dlog(Message);
+        sprintf(Message, "Símbolo de la transición: %s", afd_nombre_simbolo);
+        dlog(Message);
+
+        /* Insertamos la transición al afd minimizado */
+        AFNDInsertaTransicion(afd_min, afd_nombre_origen, afd_nombre_simbolo, afd_nombre_destino);
+        dlog("OK\n");
+    }
+    dlog("OK: Transiciones insertadas al afd con éxito");
 
     /* Liberamos memoria */
+    list_destroy(transiciones_origen);
+    list_destroy(transiciones_destino);
+    list_destroy(transiciones_simbolo);
     list_destroy(clases);
 
     dlog("\nOK: Afd convertido con éxito");
